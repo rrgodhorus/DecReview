@@ -1,0 +1,310 @@
+<template>
+  <div style="gap: 20px;">
+    <div>
+      <!-- <p v-if="walletAddress">Wallet Address: {{ walletAddress }}</p> -->
+      <input style="width: calc(10ch + 7em);" v-model="ensName" type="text" placeholder="Enter ENS name or address" />
+      <button @click="checkENSName">Check</button>
+    </div>
+    <p v-if="loading">Checking...</p>
+    <p v-if="exists !== null">
+      {{ exists ? `ENS Name resolved to ${resolvedAddress}` : 'This ENS name does not exist.' }}
+    </p>
+    <p v-if="error" class="error">{{ error }}</p>
+    <p>
+
+
+    </p>
+    <div v-if="resolvedAddress" class="reviews-container">
+      <h1>Reviews</h1>
+
+      <div v-if="reviews.length > 0">
+        <div v-for="(review, index) in reviews" :key="index" class="review-card">
+          <p><strong>Score:</strong> {{ review[0] }}</p>
+          <p><strong>Comment:</strong> {{ review[1] }}</p>
+          <p><strong>Reviewer:</strong> {{ review[2] }}</p>
+        </div>
+      </div>
+      <p v-else>No reviews available.</p>
+    </div>
+    <div v-if="resolvedAddress" class="review-container">
+      <h1>Submit Your Review</h1>
+
+      <form @submit.prevent="handleReviewSubmit" class="review-form">
+        <div class="form-group">
+          <label for="reviewScore">Score (1-10):</label>
+          <input id="reviewScore" type="number" v-model.number="reviewScore" min="1" max="10" required />
+        </div>
+
+        <div class="form-group">
+          <label for="reviewText">Review (140 characters max):</label>
+          <textarea id="reviewText" v-model="reviewText" maxlength="140" placeholder="Enter your review here..."
+            required></textarea>
+        </div>
+
+        <button type="submit" class="submit-button" :disabled="isSubmitting">
+          <span v-if="isSubmitting"> Waiting for block confirmation...</span>
+          <span v-else>Submit Review</span>
+        </button>
+      </form>
+
+      <div v-if="submitted" class="submitted-review">
+        <h2>Review Submitted &#10004;</h2>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ethers } from "ethers";
+import { getReviews, submitReview } from "../ethersHelper";
+
+
+export default {
+  props: {
+    walletAddress: String,
+  },
+  data() {
+    return {
+      ensName: "",
+      exists: null,
+      loading: false,
+      error: null,
+      resolvedAddress: null,
+      reviewScore: null, // Holds the numeric review score
+      reviewText: "",    // Holds the review text
+      isSubmitting: false,  // Used to show spinner
+      submitted: false,  // Tracks if the form has been submitted
+      reviews: [] // To hold the reviews
+    };
+  },
+  // computed: {
+  //   walletAddress() {
+  //     return this.injectedWalletAddress; // Inject wallet address from the parent
+  //   },
+  // },
+  methods: {
+    async checkENSName() {
+      if (!this.ensName) {
+        return;
+      }
+      this.loading = true;
+      this.exists = null;
+      this.error = null;
+
+      if (!this.ensName.endsWith(".eth")) {
+        try {
+          this.exists = true;
+          this.resolvedAddress = this.ensName
+          const result = await getReviews(this.ensName);
+          this.reviews = result;
+        } catch (err) {
+          this.error = "Could not find address.";
+        } finally {
+          this.loading = false;
+        }
+      }
+      else {
+        try {
+          const provider = new ethers.BrowserProvider(ethereum);
+
+          // Check if the ENS name is registered
+          const resolvedName = await provider.resolveName(this.ensName);
+          this.exists = resolvedName !== null;
+          this.resolvedAddress = resolvedName ?? null;
+          const result = await getReviews(this.ensName);
+          this.reviews = result;
+        } catch (err) {
+          this.error = "Error resolving ENS name.";
+        } finally {
+          this.loading = false;
+        }
+      }
+    },
+    async handleReviewSubmit() {
+      try {
+        if (!this.walletAddress) {
+          this.errorMessage = "Please connect your wallet first.";
+          return;
+        }
+        this.isSubmitting = true
+        // Call the contract function
+        const transactionResponse = await submitReview(this.ensName, this.reviewScore, this.reviewText);
+        const transactionReceipt = await transactionResponse.wait(1); // Wait for 1 block to confirm
+        this.submitted = true;
+        setTimeout(() => {
+          this.submitted = false
+        }, 5000);
+        const reviews = await getReviews(this.ensName);
+        this.reviews = reviews;
+        this.errorMessage = null;
+      } catch (error) {
+        console.error(error);
+        this.errorMessage = "Error interacting with the contract.";
+      } finally {
+        this.isSubmitting = false
+      }
+
+      this.reviewScore = null;
+      this.reviewText = "";
+    },
+  },
+
+};
+</script>
+
+<style scoped>
+#app {
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+  text-align: center;
+  margin-top: 60px;
+}
+
+input {
+  padding: 10px;
+  font-size: 16px;
+}
+
+button {
+  padding: 10px;
+  font-size: 16px;
+  margin-left: 10px;
+}
+
+.error {
+  color: red;
+}
+</style>
+
+<style scoped>
+/* Container Styling */
+.review-container {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: rgba(249, 249, 249, 0.1);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Title Styling */
+h1 {
+  text-align: center;
+  font-size: 24px;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+/* Form Styling */
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Form Group Styling */
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Label Styling */
+label {
+  font-weight: bold;
+  color: #222;
+  margin-bottom: 5px;
+}
+
+/* Input and Textarea Styling */
+input,
+textarea {
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  outline: none;
+  background-color: #444;
+}
+
+input:focus,
+textarea:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 3px rgba(0, 123, 255, 0.5);
+}
+
+/* Textarea Specific Styling */
+textarea {
+  resize: none;
+  height: 100px;
+}
+
+/* Button Styling */
+.submit-button {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.submit-button:hover {
+  background-color: #0056b3;
+}
+
+/* Submitted Review Section */
+.submitted-review {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #e9ffe9;
+  border: 1px solid #c3e6c3;
+  border-radius: 8px;
+  color: black;
+}
+
+.submitted-review h2 {
+  font-size: 18px;
+  color: #155724;
+}
+</style>
+
+<style scoped>
+/* Container for reviews */
+.reviews-container {
+  max-width: 600px;
+  margin: 0 auto;
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: rgba(249, 249, 249, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Title Styling */
+h1 {
+  text-align: center;
+  color: #111;
+  margin-bottom: 20px;
+}
+
+/* Review Card Styling */
+.review-card {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.review-card p {
+  margin: 5px 0;
+  color: #555;
+}
+
+.review-card p strong {
+  color: #000;
+}
+
+</style>
