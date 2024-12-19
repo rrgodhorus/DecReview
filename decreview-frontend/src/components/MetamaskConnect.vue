@@ -1,6 +1,6 @@
 <template>
     <div>
-        <button v-if="!walletAddress" @click="connectWallet">Connect MetaMask Wallet</button>
+        <button style="color: white;" v-if="!walletAddress" @click="connectWallet">Connect MetaMask Wallet</button>
         <div v-if="walletAddress">
             <h3>Connected Wallet Address:</h3>
             <p>{{ walletAddress }}</p>

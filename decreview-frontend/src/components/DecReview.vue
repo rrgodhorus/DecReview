@@ -2,8 +2,11 @@
   <div style="gap: 20px;">
     <div>
       <!-- <p v-if="walletAddress">Wallet Address: {{ walletAddress }}</p> -->
-      <input style="width: calc(10ch + 7em);" v-model="ensName" type="text" placeholder="Enter ENS name or address" />
-      <button @click="checkENSName">Check</button>
+      <form @submit.prevent="checkENSName">
+        <input style="width: calc(10ch + 7em);color: whitesmoke;" v-model="ensName" type="text"
+          placeholder="Enter ENS name or address" />
+        <button style="color: whitesmoke;" >Check</button>
+      </form>
     </div>
     <p v-if="loading">Checking...</p>
     <p v-if="exists !== null">
@@ -32,13 +35,14 @@
       <form @submit.prevent="handleReviewSubmit" class="review-form">
         <div class="form-group">
           <label for="reviewScore">Score (1-10):</label>
-          <input id="reviewScore" type="number" v-model.number="reviewScore" min="1" max="10" required />
+          <input style="color: white;" id="reviewScore" type="number" v-model.number="reviewScore" min="1" max="10"
+            required />
         </div>
 
         <div class="form-group">
           <label for="reviewText">Review (140 characters max):</label>
-          <textarea id="reviewText" v-model="reviewText" maxlength="140" placeholder="Enter your review here..."
-            required></textarea>
+          <textarea style="color: white;" id="reviewText" v-model="reviewText" maxlength="140"
+            placeholder="Enter your review here..." required></textarea>
         </div>
 
         <button type="submit" class="submit-button" :disabled="isSubmitting">
@@ -306,5 +310,4 @@ h1 {
 .review-card p strong {
   color: #000;
 }
-
 </style>
