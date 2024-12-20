@@ -103,7 +103,12 @@ export default {
         try {
           this.exists = true;
           this.resolvedAddress = this.ensName
-          const result = await getReviews(this.ensName);
+          let result = await getReviews(this.ensName);
+          result = await Promise.all(result.map(async ([score, text, reviewer]) => {
+            const reviewerEns = await provider.lookupAddress(reviewer) ?? reviewer;
+            const reviewerAvatar = await provider.getAvatar(reviewerEns);
+            return [score, text, reviewerEns, reviewerAvatar];
+          }));
           this.reviews = result;
         } catch (err) {
           this.error = "Could not find address.";
