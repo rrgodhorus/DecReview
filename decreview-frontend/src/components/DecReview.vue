@@ -5,7 +5,7 @@
       <form @submit.prevent="checkENSName">
         <input style="width: calc(10ch + 7em);color: whitesmoke;" v-model="ensName" type="text"
           placeholder="Enter ENS name or address" />
-        <button style="color: whitesmoke;" >Check</button>
+        <button style="color: whitesmoke;">Check</button>
       </form>
     </div>
     <p v-if="loading">Checking...</p>
@@ -13,18 +13,23 @@
       {{ exists ? `ENS Name resolved to ${resolvedAddress}` : 'This ENS name does not exist.' }}
     </p>
     <p v-if="error" class="error">{{ error }}</p>
-    <p>
-
-
-    </p>
+    <div v-if="avatar">
+      <img :src="avatar" style="width: 400px; height: 300px;border-radius: 50%;  ">
+    </div>
     <div v-if="resolvedAddress" class="reviews-container">
       <h1>Reviews</h1>
 
       <div v-if="reviews.length > 0">
         <div v-for="(review, index) in reviews" :key="index" class="review-card">
-          <p><strong>Score:</strong> {{ review[0] }}</p>
-          <p><strong>Comment:</strong> {{ review[1] }}</p>
-          <p><strong>Reviewer:</strong> {{ review[2] }}</p>
+          <div class="review-image">
+            <img v-if="review[3]" :src="review[3]" style="width: 150px; height: 150px; border-radius: 50%;">
+            <img v-else src="/placeholder-avatar.jpeg" style="width: 150px; height: 150px; border-radius: 50%;">
+          </div>
+          <div class="review-details">
+            <p><strong>Score:</strong> {{ review[0] }}</p>
+            <p><strong>Comment:</strong> {{ review[1] }}</p>
+            <p><strong>Reviewer:</strong> {{ review[2] }}</p>
+          </div>
         </div>
       </div>
       <p v-else>No reviews available.</p>
@@ -78,14 +83,10 @@ export default {
       reviewText: "",    // Holds the review text
       isSubmitting: false,  // Used to show spinner
       submitted: false,  // Tracks if the form has been submitted
-      reviews: [] // To hold the reviews
+      reviews: [], // To hold the reviews
+      avatar: null // Entity avatar
     };
   },
-  // computed: {
-  //   walletAddress() {
-  //     return this.injectedWalletAddress; // Inject wallet address from the parent
-  //   },
-  // },
   methods: {
     async checkENSName() {
       if (!this.ensName) {
@@ -115,7 +116,14 @@ export default {
           const resolvedName = await provider.resolveName(this.ensName);
           this.exists = resolvedName !== null;
           this.resolvedAddress = resolvedName ?? null;
-          const result = await getReviews(this.ensName);
+          this.avatar = await provider.getAvatar(this.ensName);
+          let result = await getReviews(this.ensName);
+          result = await Promise.all(result.map(async ([score, text, reviewer]) => {
+            const reviewerEns = await provider.lookupAddress(reviewer) ?? reviewer;
+            const reviewerAvatar = await provider.getAvatar(reviewerEns);
+            console.log(reviewerAvatar);
+            return [score, text, reviewerEns, reviewerAvatar];
+          }));
           this.reviews = result;
         } catch (err) {
           this.error = "Error resolving ENS name.";
@@ -297,9 +305,11 @@ h1 {
   background-color: #fff;
   border: 1px solid #ddd;
   border-radius: 8px;
-  padding: 15px;
+  padding: 10px;
   margin-bottom: 15px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center; /* Vertically aligns image and text */
 }
 
 .review-card p {
@@ -309,5 +319,14 @@ h1 {
 
 .review-card p strong {
   color: #000;
+}
+
+.review-image {
+  margin-right: 20px;
+}
+
+.review-details {
+  max-width: 600px;
+  text-align: left;
 }
 </style>

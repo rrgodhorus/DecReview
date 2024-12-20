@@ -3,7 +3,7 @@
         <button style="color: white;" v-if="!walletAddress" @click="connectWallet">Connect MetaMask Wallet</button>
         <div v-if="walletAddress">
             <h3>Connected Wallet Address:</h3>
-            <p>{{ walletAddress }}</p>
+            <p>{{ ensName ? `${ensName} (${walletAddress})` : walletAddress }}</p>
         </div>
         <p v-if="error" class="error">{{ error }}</p>
     </div>
@@ -16,7 +16,8 @@ export default {
     data() {
         return {
             error: null,
-            walletAddress: null
+            walletAddress: null,
+            ensName: null
         };
     },
     methods: {
@@ -33,6 +34,7 @@ export default {
                     // Get the wallet address
                     const address = await signer.getAddress();
                     this.walletAddress = address;
+                    this.ensName = await provider.lookupAddress(address);
                     this.$emit("update-address", address);
                 } catch (error) {
                     console.error(error);
