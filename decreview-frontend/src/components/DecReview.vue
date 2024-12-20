@@ -1,7 +1,6 @@
 <template>
   <div style="gap: 20px;">
     <div>
-      <!-- <p v-if="walletAddress">Wallet Address: {{ walletAddress }}</p> -->
       <form @submit.prevent="checkENSName">
         <input style="width: calc(10ch + 7em);color: whitesmoke;" v-model="ensName" type="text" autocomplete="on"
           placeholder="Enter ENS name or address" />
@@ -13,7 +12,7 @@
       {{ exists ? `ENS Name resolved to ${resolvedAddress}` : 'This ENS name does not exist.' }}
     </p>
     <p v-if="error" class="error">{{ error }}</p>
-    <div class="">
+    <div v-if="resolvedAddress">
       <img v-if="entity?.avatar" :src="entity?.avatar" style="width: 400px; height: 300px;border-radius: 50%;  ">
       <h3 v-if="entity?.name">{{ entity?.name }}</h3>
       <p v-if="entity?.description">{{ entity?.description }}</p>
@@ -66,7 +65,7 @@
 </template>
 
 <script>
-import { ethers } from "ethers";
+import { ethers, isAddress } from "ethers";
 import { getReviews, submitReview } from "../ethersHelper";
 
 
@@ -99,48 +98,40 @@ export default {
       this.exists = null;
       this.error = null;
 
-      if (!this.ensName.endsWith(".eth")) {
-        try {
+      try {
+        const provider = new ethers.BrowserProvider(ethereum);
+        if (this.ensName.startsWith("0x")) {
+          if (!isAddress(this.ensName)) {
+            this.exists = null;
+            this.loading = false;
+            this.resolvedAddress = null;
+            this.error = "Not a valid Address";
+            return;
+          }
           this.exists = true;
-          this.resolvedAddress = this.ensName
-          let result = await getReviews(this.ensName);
-          result = await Promise.all(result.map(async ([score, text, reviewer]) => {
-            const reviewerEns = await provider.lookupAddress(reviewer) ?? reviewer;
-            const reviewerAvatar = await provider.getAvatar(reviewerEns);
-            return [score, text, reviewerEns, reviewerAvatar];
-          }));
-          this.reviews = result;
-        } catch (err) {
-          this.error = "Could not find address.";
-        } finally {
-          this.loading = false;
+          this.ensName = await provider.lookupAddress(this.ensName) ?? this.ensName;
         }
-      }
-      else {
-        try {
-          const provider = new ethers.BrowserProvider(ethereum);
 
-          // Check if the ENS name is registered
-          const resolvedName = await provider.resolveName(this.ensName);
-          this.exists = resolvedName !== null;
-          this.resolvedAddress = resolvedName ?? null;
-          this.entity.avatar = await provider.getAvatar(this.ensName);
-          const resolver = await provider.getResolver(this.ensName);
-          this.entity.name = await resolver.getText("name");
-          this.entity.description = await resolver.getText("description");
-          let result = await getReviews(this.ensName);
-          result = await Promise.all(result.map(async ([score, text, reviewer]) => {
-            const reviewerEns = await provider.lookupAddress(reviewer) ?? reviewer;
-            const reviewerAvatar = await provider.getAvatar(reviewerEns);
-            return [score, text, reviewerEns, reviewerAvatar];
-          }));
-          this.reviews = result;
-        } catch (err) {
-          console.log(err)
-          this.error = "Error resolving ENS name.";
-        } finally {
-          this.loading = false;
-        }
+        // Check if the ENS name is registered
+        const resolvedName = await provider.resolveName(this.ensName);
+        this.exists = this.exists ?? resolvedName;
+        this.resolvedAddress = resolvedName ?? this.ensName;
+        this.entity.avatar = await provider.getAvatar(this.ensName);
+        const resolver = await provider.getResolver(this.ensName);
+        this.entity.name = await resolver?.getText("name");
+        this.entity.description = await resolver?.getText("description");
+        let result = await getReviews(this.ensName);
+        result = await Promise.all(result.map(async ([score, text, reviewer]) => {
+          const reviewerEns = await provider.lookupAddress(reviewer) ?? reviewer;
+          const reviewerAvatar = await provider.getAvatar(reviewerEns);
+          return [score, text, reviewerEns, reviewerAvatar];
+        }));
+        this.reviews = result;
+      } catch (err) {
+        console.log(err)
+        this.error = "Error resolving ENS name.";
+      } finally {
+        this.loading = false;
       }
     },
     async handleReviewSubmit() {
