@@ -3,7 +3,7 @@
     <div>
       <!-- <p v-if="walletAddress">Wallet Address: {{ walletAddress }}</p> -->
       <form @submit.prevent="checkENSName">
-        <input style="width: calc(10ch + 7em);color: whitesmoke;" v-model="ensName" type="text"
+        <input style="width: calc(10ch + 7em);color: whitesmoke;" v-model="ensName" type="text" autocomplete="on"
           placeholder="Enter ENS name or address" />
         <button style="color: whitesmoke;">Check</button>
       </form>
@@ -13,8 +13,10 @@
       {{ exists ? `ENS Name resolved to ${resolvedAddress}` : 'This ENS name does not exist.' }}
     </p>
     <p v-if="error" class="error">{{ error }}</p>
-    <div v-if="avatar">
-      <img :src="avatar" style="width: 400px; height: 300px;border-radius: 50%;  ">
+    <div class="">
+      <img v-if="entity?.avatar" :src="entity?.avatar" style="width: 400px; height: 300px;border-radius: 50%;  ">
+      <h3 v-if="entity?.name">{{ entity?.name }}</h3>
+      <p v-if="entity?.description">{{ entity?.description }}</p>
     </div>
     <div v-if="resolvedAddress" class="reviews-container">
       <h1>Reviews</h1>
@@ -84,7 +86,7 @@ export default {
       isSubmitting: false,  // Used to show spinner
       submitted: false,  // Tracks if the form has been submitted
       reviews: [], // To hold the reviews
-      avatar: null // Entity avatar
+      entity: {} // Entity
     };
   },
   methods: {
@@ -116,16 +118,19 @@ export default {
           const resolvedName = await provider.resolveName(this.ensName);
           this.exists = resolvedName !== null;
           this.resolvedAddress = resolvedName ?? null;
-          this.avatar = await provider.getAvatar(this.ensName);
+          this.entity.avatar = await provider.getAvatar(this.ensName);
+          const resolver = await provider.getResolver(this.ensName);
+          this.entity.name = await resolver.getText("name");
+          this.entity.description = await resolver.getText("description");
           let result = await getReviews(this.ensName);
           result = await Promise.all(result.map(async ([score, text, reviewer]) => {
             const reviewerEns = await provider.lookupAddress(reviewer) ?? reviewer;
             const reviewerAvatar = await provider.getAvatar(reviewerEns);
-            console.log(reviewerAvatar);
             return [score, text, reviewerEns, reviewerAvatar];
           }));
           this.reviews = result;
         } catch (err) {
+          console.log(err)
           this.error = "Error resolving ENS name.";
         } finally {
           this.loading = false;
@@ -145,9 +150,14 @@ export default {
         this.submitted = true;
         setTimeout(() => {
           this.submitted = false
-        }, 5000);
-        const reviews = await getReviews(this.ensName);
-        this.reviews = reviews;
+        }, 2000);
+        let result = await getReviews(this.ensName);
+        result = await Promise.all(result.map(async ([score, text, reviewer]) => {
+          const reviewerEns = await provider.lookupAddress(reviewer) ?? reviewer;
+          const reviewerAvatar = await provider.getAvatar(reviewerEns);
+          return [score, text, reviewerEns, reviewerAvatar];
+        }));
+        this.reviews = result;
         this.errorMessage = null;
       } catch (error) {
         console.error(error);
@@ -309,7 +319,8 @@ h1 {
   margin-bottom: 15px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
-  align-items: center; /* Vertically aligns image and text */
+  align-items: center;
+  /* Vertically aligns image and text */
 }
 
 .review-card p {
