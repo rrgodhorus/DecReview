@@ -76,6 +76,7 @@ export default {
   },
   data() {
     return {
+      isRedirect: null,
       ensName: "",
       exists: null,
       loading: false,
@@ -170,7 +171,13 @@ export default {
       this.reviewText = "";
     },
   },
-
+  mounted() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const entityAddress = urlParams.get('entity');
+    this.isRedirect = true;
+    this.ensName = entityAddress;
+    this.checkENSName();
+  }
 };
 </script>
 
